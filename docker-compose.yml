@@ -3,7 +3,7 @@
 #   docker compose up -d      # 시작
 #   docker compose down       # 정지 (데이터는 볼륨에 남는다)
 #
-# 포트가 레오네페리토(5432 · 1025 · 8025)와 겹치지 않게 5433 · 1026 · 8026 을 쓴다 — 둘을 같이 띄운다.
+# 포트가 레오네페리토(5432 · 1025 · 8025)와 겹치지 않게 5434 · 1026 · 8026 을 쓴다 — 둘을 같이 띄운다.
 # 여기 적힌 자격증명은 localhost 전용 개발값이다. 운영 값은 .env 로만 넣는다.
 
 services:
@@ -20,7 +20,7 @@ services:
       TZ: Asia/Seoul
     ports:
       # 127.0.0.1 에만 바인딩한다.
-      - "127.0.0.1:${DB_PORT:-5433}:5432"
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
     volumes:
       # PostgreSQL 18 은 /var/lib/postgresql 을 통째로 받는다 (레오네페리토 docker-compose.yml 주석 참고).
       - db-data:/var/lib/postgresql

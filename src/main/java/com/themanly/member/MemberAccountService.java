@@ -6,6 +6,9 @@ import com.themanly.booking.AppointmentRepository;
 import com.themanly.booking.AppointmentStatus;
 import com.themanly.common.error.DomainRuleException;
 import com.themanly.common.error.ResourceNotFoundException;
+import com.themanly.measurement.MeasurementRepository;
+import com.themanly.order.BespokeOrderRepository;
+import com.themanly.order.OrderStatus;
 import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -26,14 +29,19 @@ public class MemberAccountService {
     private final PasswordPolicy passwordPolicy;
     private final SessionTerminator sessionTerminator;
     private final AppointmentRepository appointments;
+    private final BespokeOrderRepository orders;
+    private final MeasurementRepository measurements;
 
     public MemberAccountService(MemberRepository members, PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy,
-                                SessionTerminator sessionTerminator, AppointmentRepository appointments) {
+                                SessionTerminator sessionTerminator, AppointmentRepository appointments,
+                                BespokeOrderRepository orders, MeasurementRepository measurements) {
         this.members = members;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
         this.sessionTerminator = sessionTerminator;
         this.appointments = appointments;
+        this.orders = orders;
+        this.measurements = measurements;
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +71,10 @@ public class MemberAccountService {
         log.info("비밀번호 변경 memberId={}", memberId);
     }
 
-    /** 탈퇴. 관리자는 못 한다(권한을 먼저 내린다). 진행 중 예약이 있으면 못 한다. 세션을 끊고 익명화한다. */
+    /**
+     * 탈퇴. 관리자는 못 한다(권한을 먼저 내린다). 진행 중 예약 · 맞춤 주문이 있으면 못 한다.
+     * 세션을 끊고 익명화하고, 치수 기록은 지운다 — 몸 치수는 남겨 둘 이유가 없는 개인정보다.
+     */
     @Transactional
     public void withdraw(UUID memberId, String password) {
         Member member = get(memberId);
@@ -77,7 +88,11 @@ public class MemberAccountService {
             throw new DomainRuleException("APPOINTMENTS_IN_PROGRESS", "진행 중인 예약이 있어 탈퇴할 수 없습니다. 예약을 취소하거나 끝난 뒤 다시 시도해 주세요.",
                     HttpStatus.CONFLICT);
         }
+        if (orders.existsByMemberIdAndStatus(memberId, OrderStatus.IN_PROGRESS)) {
+            throw new DomainRuleException("ORDERS_IN_PROGRESS", "진행 중인 맞춤 주문이 있어 탈퇴할 수 없습니다. 매장으로 연락해 주세요.");
+        }
         sessionTerminator.terminateAll(member.getEmail());
+        measurements.deleteByMemberId(memberId);
         member.withdraw(Instant.now());
         log.info("회원 탈퇴 memberId={}", memberId);
     }

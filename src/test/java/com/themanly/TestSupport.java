@@ -31,6 +31,8 @@ public final class TestSupport {
     public static void cleanDatabase(JdbcTemplate jdbc) {
         jdbc.update("DELETE FROM spring_session");
         jdbc.update("DELETE FROM appointment");
+        jdbc.update("DELETE FROM bespoke_order");
+        jdbc.update("DELETE FROM measurement");
         jdbc.update("DELETE FROM password_reset_token");
         jdbc.update("DELETE FROM member");
         jdbc.update("DELETE FROM fabric");

@@ -127,7 +127,7 @@ spring:
       on-profile: local
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:themanly}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:themanly}
     username: ${DB_USERNAME:themanly}
     password: ${DB_PASSWORD:themanly_local_only}
     driver-class-name: org.postgresql.Driver

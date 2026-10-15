@@ -16,6 +16,8 @@ public interface StyleOptionRepository extends JpaRepository<StyleOption, UUID> 
 
     Optional<StyleOption> findByCategoryAndDefaultChoiceTrue(StyleOption.Category category);
 
+    Optional<StyleOption> findByCategoryAndCode(StyleOption.Category category, String code);
+
     @Query("SELECT COALESCE(MAX(o.sortOrder), 0) FROM StyleOption o WHERE o.category = :category")
     int maxSortOrder(StyleOption.Category category);
 }
