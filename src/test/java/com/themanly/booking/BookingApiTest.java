@@ -171,6 +171,55 @@ class BookingApiTest {
     }
 
     @Test
+    @DisplayName("가봉 예약을 주문에 묶는다 — 내 진행 중 주문만. 관리자는 바로 확정 예약을 만들고, 주문 상세 · 회원 상세 · 대시보드에 보인다")
+    void orderLinkedAndAdminCreated() throws Exception {
+        String hongId = jdbc.queryForObject("SELECT id::text FROM member WHERE email = ?", String.class, HONG);
+        String no = JsonPath.read(mockMvc.perform(csrf(mockMvc, post("/api/admin/members/" + hongId + "/orders"), admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"garment\":\"SUIT_2PC\",\"title\":\"네이비 수트\",\"styles\":{},\"message\":\"\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.order.summary.orderNumber");
+
+        // 남의 주문(김철수) · 없는 주문번호 → 400
+        mockMvc.perform(csrf(mockMvc, post("/api/bookings"), kim).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"FITTING\",\"startsAt\":\"%s\",\"orderNumber\":\"%s\"}".formatted(slot, no)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("UNKNOWN_ORDER"));
+        // 내 주문 → 묶인다
+        mockMvc.perform(csrf(mockMvc, post("/api/bookings"), hong).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"FITTING\",\"startsAt\":\"%s\",\"orderNumber\":\"%s\"}".formatted(slot, no)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.orderNumber").value(no));
+        mockMvc.perform(get("/api/bookings/mine").cookie(hong)).andExpect(jsonPath("$[0].orderNumber").value(no));
+
+        // 관리자가 수령 예약을 바로 확정으로 — 24시간 제한 없이, 빈 자리면 된다
+        Instant other = policy.slotsOn(day).get(3);
+        mockMvc.perform(csrf(mockMvc, post("/api/admin/members/" + hongId + "/bookings"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"PICKUP\",\"startsAt\":\"%s\",\"adminNote\":\"완성 뒤 수령\",\"orderNumber\":\"%s\"}".formatted(other, no)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.orderNumber").value(no))
+                .andExpect(jsonPath("$.customer.name").value("홍길동"));
+        assertThat(mailer.to(HONG)).anySatisfy(m -> assertThat(m.subject()).contains("수령 예약이 확정"));
+        mockMvc.perform(csrf(mockMvc, post("/api/admin/members/" + hongId + "/bookings"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"PICKUP\",\"startsAt\":\"%s\"}".formatted(other)))
+                .andExpect(status().isConflict()); // 같은 자리
+
+        mockMvc.perform(get("/api/admin/orders/" + no).cookie(admin))
+                .andExpect(jsonPath("$.bookings.length()").value(2))
+                .andExpect(jsonPath("$.bookings[0].type").value("FITTING"))
+                .andExpect(jsonPath("$.bookings[1].status").value("CONFIRMED"));
+        mockMvc.perform(get("/api/admin/members/" + hongId + "/overview").cookie(admin))
+                .andExpect(jsonPath("$.member.name").value("홍길동"))
+                .andExpect(jsonPath("$.latestMeasurement").isEmpty())
+                .andExpect(jsonPath("$.orders.length()").value(1))
+                .andExpect(jsonPath("$.upcoming.length()").value(2));
+        mockMvc.perform(get("/api/admin/dashboard").cookie(admin))
+                .andExpect(jsonPath("$.requestedAppointments").value(1))
+                .andExpect(jsonPath("$.inProgressOrders").value(1))
+                .andExpect(jsonPath("$.ordersByStage.CONSULTATION").value(1))
+                .andExpect(jsonPath("$.ordersByStage.FITTING").value(0));
+        mockMvc.perform(get("/api/admin/dashboard").cookie(hong)).andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("관리자 시간 옮기기 — 신청 상태면 옮긴 김에 확정, 빈 자리여야 한다. 예약이 살아 있으면 탈퇴할 수 없다")
     void rescheduleAndWithdraw() throws Exception {
         String res = mockMvc.perform(csrf(mockMvc, post("/api/bookings"), hong).contentType(MediaType.APPLICATION_JSON).content(body(slot)))

@@ -5,6 +5,7 @@ import com.themanly.booking.Appointment;
 import com.themanly.booking.AppointmentStatus;
 import com.themanly.booking.AppointmentType;
 import com.themanly.booking.BookingService;
+import com.themanly.order.BespokeOrderRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -30,9 +31,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class BookingController {
 
     private final BookingService bookings;
+    private final BespokeOrderRepository orders;
 
-    public BookingController(BookingService bookings) {
+    public BookingController(BookingService bookings, BespokeOrderRepository orders) {
         this.bookings = bookings;
+        this.orders = orders;
     }
 
     /** 빈 시간. {@code from} · {@code to} 는 yyyy-MM-dd(한국 날짜). 31일 이내. */
@@ -45,30 +48,40 @@ public class BookingController {
 
     @PostMapping
     public ResponseEntity<View> request(@AuthenticationPrincipal MemberPrincipal principal, @Valid @RequestBody Request in) {
-        Appointment a = bookings.request(principal.getId(), in.type(), in.startsAt(), in.note());
-        return ResponseEntity.status(HttpStatus.CREATED).body(View.from(a));
+        Appointment a = bookings.request(principal.getId(), in.type(), in.startsAt(), in.note(), in.orderNumber());
+        return ResponseEntity.status(HttpStatus.CREATED).body(view(a));
     }
 
     @GetMapping("/mine")
     public List<View> mine(@AuthenticationPrincipal MemberPrincipal principal) {
-        return bookings.mine(principal.getId()).stream().map(View::from).toList();
+        return bookings.mine(principal.getId()).stream().map(this::view).toList();
     }
 
     @PostMapping("/{id}/cancel")
     public View cancel(@AuthenticationPrincipal MemberPrincipal principal, @PathVariable UUID id) {
-        return View.from(bookings.cancelByCustomer(principal.getId(), id));
+        return view(bookings.cancelByCustomer(principal.getId(), id));
     }
 
-    public record Request(@NotNull AppointmentType type, @NotNull Instant startsAt, @Size(max = 1000) String note) {
+    private View view(Appointment a) {
+        String orderNumber = a.getOrderId() == null ? null
+                : orders.findById(a.getOrderId()).map(o -> o.getOrderNumber()).orElse(null);
+        return View.from(a, orderNumber);
+    }
+
+    /** orderNumber — 가봉 · 수령 예약이면 어느 주문인지(내 진행 중 주문). 상담이면 비운다. */
+    public record Request(@NotNull AppointmentType type, @NotNull Instant startsAt, @Size(max = 1000) String note,
+                          @Size(max = 20) String orderNumber) {
     }
 
     /** 손님에게 보이는 예약. 관리자 메모는 나가지 않는다. */
     public record View(UUID id, AppointmentType type, String typeLabel, AppointmentStatus status, String statusLabel,
-                       Instant startsAt, int durationMinutes, String note, String cancelReason, Instant createdAt) {
-        static View from(Appointment a) {
+                       Instant startsAt, int durationMinutes, String note, String cancelReason, Instant createdAt,
+                       String orderNumber) {
+        static View from(Appointment a, String orderNumber) {
             return new View(a.getId(), a.getType(), a.getType().label(), a.getStatus(), a.getStatus().label(), a.getStartsAt(),
                     a.getDurationMinutes(), a.getCustomerNote(),
-                    a.getCancelledBy() == Appointment.CancelledBy.ADMIN ? a.getCancelReason() : null, a.getCreatedAt());
+                    a.getCancelledBy() == Appointment.CancelledBy.ADMIN ? a.getCancelReason() : null, a.getCreatedAt(),
+                    orderNumber);
         }
     }
 }

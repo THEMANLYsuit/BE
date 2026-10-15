@@ -4,7 +4,9 @@ import com.themanly.common.error.DomainRuleException;
 import com.themanly.common.error.ResourceNotFoundException;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -87,6 +89,34 @@ public class CatalogService {
         fabric.changeStatus(status);
         log.info("원단 상태 id={} status={}", id, status);
         return fabric;
+    }
+
+    /** 원단 순서 — 관리자가 끌어 놓은 순서대로 id 목록을 준다. 목록에 없는 원단은 뒤로 밀린다. */
+    @Transactional
+    public void reorderFabrics(List<UUID> ids) {
+        List<Fabric> found = fabrics.findByIdIn(ids);
+        if (found.size() != ids.stream().distinct().count()) {
+            throw DomainRuleException.badRequest("UNKNOWN_FABRIC", "목록에 없는 원단이 섞여 있습니다. 화면을 새로고침해 주세요.");
+        }
+        Map<UUID, Fabric> byId = found.stream().collect(Collectors.toMap(Fabric::getId, f -> f));
+        for (int i = 0; i < ids.size(); i++) {
+            byId.get(ids.get(i)).moveTo((i + 1) * 10);
+        }
+        log.info("원단 순서 변경 count={}", ids.size());
+    }
+
+    /** 스타일 선택지 순서 — 같은 묶음 안에서만. */
+    @Transactional
+    public void reorderStyleOptions(StyleOption.Category category, List<UUID> ids) {
+        List<StyleOption> found = styleOptions.findByIdIn(ids);
+        if (found.size() != ids.stream().distinct().count() || found.stream().anyMatch(o -> o.getCategory() != category)) {
+            throw DomainRuleException.badRequest("UNKNOWN_STYLE", "같은 묶음의 선택지만 순서를 바꿀 수 있습니다. 화면을 새로고침해 주세요.");
+        }
+        Map<UUID, StyleOption> byId = found.stream().collect(Collectors.toMap(StyleOption::getId, o -> o));
+        for (int i = 0; i < ids.size(); i++) {
+            byId.get(ids.get(i)).moveTo((i + 1) * 10);
+        }
+        log.info("스타일 선택지 순서 변경 category={} count={}", category, ids.size());
     }
 
     // ── 관리자: 스타일 선택지 ─────────────────────────────

@@ -59,6 +59,10 @@ public class Appointment {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
+    /** 가봉 · 수령 예약이 속한 맞춤 주문(V7). 상담 예약은 null. */
+    @Column(name = "order_id")
+    private UUID orderId;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -80,6 +84,19 @@ public class Appointment {
         a.customerNote = customerNote == null ? "" : customerNote.trim();
         a.adminNote = "";
         return a;
+    }
+
+    /** 관리자가 상담 중에 잡는 예약 — 손님 신청 없이 바로 확정. */
+    public static Appointment byAdmin(UUID memberId, AppointmentType type, Instant startsAt, String adminNote, Instant now) {
+        Appointment a = request(memberId, type, startsAt, null);
+        a.adminNote = adminNote == null ? "" : adminNote.trim();
+        a.status = AppointmentStatus.CONFIRMED;
+        a.confirmedAt = now;
+        return a;
+    }
+
+    public void linkOrder(UUID orderId) {
+        this.orderId = orderId;
     }
 
     public boolean isOwnedBy(UUID memberId) {
@@ -192,5 +209,9 @@ public class Appointment {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public UUID getOrderId() {
+        return orderId;
     }
 }

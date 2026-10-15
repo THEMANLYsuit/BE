@@ -76,7 +76,7 @@ public class AdminMemberController {
 
     public record View(UUID id, String email, String name, String phone, MemberStatus status, MemberRole role, String loginId,
                        boolean locked, Instant lastLoginAt, Instant createdAt) {
-        static View from(Member m) {
+        public static View from(Member m) {
             return new View(m.getId(), m.getEmail(), m.getName(), m.getPhone(), m.getStatus(), m.getRole(), m.getLoginId(),
                     m.isLocked(Instant.now()), m.getLastLoginAt(), m.getCreatedAt());
         }

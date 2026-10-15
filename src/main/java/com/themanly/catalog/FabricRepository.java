@@ -20,4 +20,6 @@ public interface FabricRepository extends JpaRepository<Fabric, UUID> {
 
     @Query("SELECT COALESCE(MAX(f.sortOrder), 0) FROM Fabric f")
     int maxSortOrder();
+
+    List<Fabric> findByIdIn(Collection<UUID> ids);
 }

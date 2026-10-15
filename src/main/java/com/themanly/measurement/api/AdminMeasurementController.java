@@ -77,7 +77,7 @@ public class AdminMeasurementController {
 
     public record AdminView(UUID id, UUID memberId, LocalDate measuredOn, String bodyNote, String adminNote,
                             List<MeasurementController.PointView> points, Instant createdAt, Instant updatedAt) {
-        static AdminView from(Measurement m) {
+        public static AdminView from(Measurement m) {
             return new AdminView(m.getId(), m.getMemberId(), m.getMeasuredOn(), m.getBodyNote(), m.getAdminNote(),
                     MeasurementController.PointView.of(m), m.getCreatedAt(), m.getUpdatedAt());
         }

@@ -1,5 +1,9 @@
 package com.themanly.order.api;
 
+import com.themanly.booking.Appointment;
+import com.themanly.booking.AppointmentStatus;
+import com.themanly.booking.AppointmentType;
+import com.themanly.booking.BookingService;
 import com.themanly.catalog.StyleOption;
 import com.themanly.member.Member;
 import com.themanly.order.BespokeOrderService;
@@ -11,6 +15,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminOrderController {
 
     private final BespokeOrderService orders;
+    private final BookingService bookings;
 
-    public AdminOrderController(BespokeOrderService orders) {
+    public AdminOrderController(BespokeOrderService orders, BookingService bookings) {
         this.orders = orders;
+        this.bookings = bookings;
     }
 
     @GetMapping("/orders")
@@ -52,37 +59,37 @@ public class AdminOrderController {
 
     @PostMapping("/members/{memberId}/orders")
     public ResponseEntity<AdminDetail> open(@PathVariable UUID memberId, @Valid @RequestBody OrderInput in) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(AdminDetail.from(orders.open(memberId, in.toService(), in.message())));
+        return ResponseEntity.status(HttpStatus.CREATED).body(detail(orders.open(memberId, in.toService(), in.message())));
     }
 
     @GetMapping("/orders/{orderNumber}")
     public AdminDetail get(@PathVariable String orderNumber) {
-        return AdminDetail.from(orders.get(orderNumber));
+        return detail(orders.get(orderNumber));
     }
 
     @PutMapping("/orders/{orderNumber}")
     public AdminDetail update(@PathVariable String orderNumber, @Valid @RequestBody OrderInput in) {
-        return AdminDetail.from(orders.update(orderNumber, in.toService()));
+        return detail(orders.update(orderNumber, in.toService()));
     }
 
     @PostMapping("/orders/{orderNumber}/stage")
     public AdminDetail moveTo(@PathVariable String orderNumber, @Valid @RequestBody StageInput in) {
-        return AdminDetail.from(orders.moveTo(orderNumber, in.stage(), in.message()));
+        return detail(orders.moveTo(orderNumber, in.stage(), in.message()));
     }
 
     @PostMapping("/orders/{orderNumber}/notes")
     public AdminDetail note(@PathVariable String orderNumber, @Valid @RequestBody MessageInput in) {
-        return AdminDetail.from(orders.note(orderNumber, in.message()));
+        return detail(orders.note(orderNumber, in.message()));
     }
 
     @PostMapping("/orders/{orderNumber}/complete")
     public AdminDetail complete(@PathVariable String orderNumber, @Valid @RequestBody MessageInput in) {
-        return AdminDetail.from(orders.complete(orderNumber, in.message()));
+        return detail(orders.complete(orderNumber, in.message()));
     }
 
     @PostMapping("/orders/{orderNumber}/cancel")
     public AdminDetail cancel(@PathVariable String orderNumber, @Valid @RequestBody CancelInput in) {
-        return AdminDetail.from(orders.cancel(orderNumber, in.reason()));
+        return detail(orders.cancel(orderNumber, in.reason()));
     }
 
     public record OrderInput(@NotNull Garment garment, @NotBlank @Size(max = 80) String title, UUID fabricId,
@@ -92,6 +99,18 @@ public class AdminOrderController {
         BespokeOrderService.Input toService() {
             return new BespokeOrderService.Input(garment, title, fabricId, fabricNote, measurementId, styles, priceKrw, depositKrw,
                     dueOn, adminNote);
+        }
+    }
+
+    private AdminDetail detail(BespokeOrderService.Described d) {
+        return AdminDetail.from(d, bookings.ofOrder(d.order().getId()).stream().map(Booking::of).toList());
+    }
+
+    /** 이 주문에 묶인 예약(가봉 · 수령). 취소된 것도 보인다. */
+    public record Booking(UUID id, AppointmentType type, String typeLabel, AppointmentStatus status, String statusLabel,
+                          Instant startsAt) {
+        static Booking of(Appointment a) {
+            return new Booking(a.getId(), a.getType(), a.getType().label(), a.getStatus(), a.getStatus().label(), a.getStartsAt());
         }
     }
 
@@ -118,10 +137,10 @@ public class AdminOrderController {
     }
 
     public record AdminDetail(MyOrderController.Detail order, Customer customer, UUID fabricId, UUID measurementId,
-                              Map<StyleOption.Category, String> styleCodes, String adminNote) {
-        static AdminDetail from(BespokeOrderService.Described d) {
+                              Map<StyleOption.Category, String> styleCodes, String adminNote, List<Booking> bookings) {
+        static AdminDetail from(BespokeOrderService.Described d, List<Booking> bookings) {
             return new AdminDetail(MyOrderController.Detail.from(d), Customer.of(d.member()), d.order().getFabricId(),
-                    d.order().getMeasurementId(), d.order().getStyles(), d.order().getAdminNote());
+                    d.order().getMeasurementId(), d.order().getStyles(), d.order().getAdminNote(), bookings);
         }
     }
 

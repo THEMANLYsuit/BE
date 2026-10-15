@@ -124,6 +124,27 @@ class CatalogApiTest {
     }
 
     @Test
+    @DisplayName("원단 순서 — 관리자가 준 id 순서대로 손님 목록이 바뀐다. 모르는 id 가 섞이면 400")
+    void reorderFabrics() throws Exception {
+        String a = JsonPath.read(mockMvc.perform(csrf(mockMvc, post("/api/admin/fabrics"), admin).contentType(MediaType.APPLICATION_JSON)
+                .content(fabric("A-1", "첫째"))).andReturn().getResponse().getContentAsString(), "$.id");
+        String b = JsonPath.read(mockMvc.perform(csrf(mockMvc, post("/api/admin/fabrics"), admin).contentType(MediaType.APPLICATION_JSON)
+                .content(fabric("B-1", "둘째"))).andReturn().getResponse().getContentAsString(), "$.id");
+        for (String id : new String[] {a, b}) {
+            mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/" + id + "/status"), admin).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"status\":\"PUBLISHED\"}")).andExpect(status().isOk());
+        }
+        mockMvc.perform(get("/api/fabrics")).andExpect(jsonPath("$[0].name").value("첫째"));
+        mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/order"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + b + "\",\"" + a + "\"]}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/fabrics")).andExpect(jsonPath("$[0].name").value("둘째")).andExpect(jsonPath("$[1].name").value("첫째"));
+        mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/order"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + java.util.UUID.randomUUID() + "\"]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("손님은 카탈로그를 고칠 수 없다 — 로그인하지 않으면 401, 손님이면 403")
     void customerCannotEdit() throws Exception {
         mockMvc.perform(csrf(mockMvc, post("/api/admin/fabrics")).contentType(MediaType.APPLICATION_JSON).content(fabric("A-1", "a")))

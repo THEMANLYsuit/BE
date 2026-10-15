@@ -15,6 +15,9 @@ public interface BespokeOrderRepository extends JpaRepository<BespokeOrder, UUID
     boolean existsByOrderNumber(String orderNumber);
     List<BespokeOrder> findByMemberIdOrderByCreatedAtDesc(UUID memberId);
     boolean existsByMemberIdAndStatus(UUID memberId, OrderStatus status);
+
+    /** 진행 중 주문 전부 — 대시보드가 단계별로 센다. 최근에 움직인 것부터. */
+    List<BespokeOrder> findByStatusOrderByLastEventAtDesc(OrderStatus status);
     @Query("""
             SELECT o FROM BespokeOrder o
             WHERE o.status IN :statuses

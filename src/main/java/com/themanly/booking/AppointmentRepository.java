@@ -19,4 +19,15 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     long countByMemberIdAndStatusIn(UUID memberId, Collection<AppointmentStatus> statuses);
 
     boolean existsByMemberIdAndStatusIn(UUID memberId, Collection<AppointmentStatus> statuses);
+
+    /** 한 주문에 묶인 예약 — 관리자 주문 상세의 "가봉 일정". */
+    List<Appointment> findByOrderIdOrderByStartsAtAsc(UUID orderId);
+
+    /** 지금부터 — 관리자 회원 상세 · 대시보드의 "다가오는 예약". */
+    List<Appointment> findByMemberIdAndStartsAtAfterAndStatusInOrderByStartsAtAsc(UUID memberId, Instant after,
+                                                                                   Collection<AppointmentStatus> statuses);
+
+    long countByStartsAtBetweenAndStatusIn(Instant from, Instant to, Collection<AppointmentStatus> statuses);
+
+    long countByStatus(AppointmentStatus status);
 }

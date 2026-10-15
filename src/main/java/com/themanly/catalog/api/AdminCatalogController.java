@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -62,6 +63,18 @@ public class AdminCatalogController {
         return FabricAdminView.from(catalog.changeFabricStatus(id, in.status()));
     }
 
+    @PutMapping("/fabrics/order")
+    public ResponseEntity<Void> reorderFabrics(@Valid @RequestBody OrderInput in) {
+        catalog.reorderFabrics(in.ids());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/style-options/order")
+    public ResponseEntity<Void> reorderStyleOptions(@Valid @RequestBody StyleOrderInput in) {
+        catalog.reorderStyleOptions(in.category(), in.ids());
+        return ResponseEntity.noContent().build();
+    }
+
     // ── 스타일 선택지 ────────────────────────────────────
 
     @GetMapping("/style-options")
@@ -102,6 +115,12 @@ public class AdminCatalogController {
     }
 
     public record StatusInput(@NotNull Fabric.Status status) {
+    }
+
+    public record OrderInput(@NotEmpty @Size(max = 500) List<UUID> ids) {
+    }
+
+    public record StyleOrderInput(@NotNull StyleOption.Category category, @NotEmpty @Size(max = 200) List<UUID> ids) {
     }
 
     public record StyleOptionInput(

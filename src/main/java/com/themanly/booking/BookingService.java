@@ -4,6 +4,9 @@ import com.themanly.common.error.DomainRuleException;
 import com.themanly.common.error.ResourceNotFoundException;
 import com.themanly.member.Member;
 import com.themanly.member.MemberRepository;
+import com.themanly.order.BespokeOrder;
+import com.themanly.order.BespokeOrderRepository;
+import com.themanly.order.OrderStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -40,13 +43,15 @@ public class BookingService {
     private final MemberRepository members;
     private final BookingPolicy policy;
     private final ApplicationEventPublisher events;
+    private final BespokeOrderRepository orders;
 
     public BookingService(AppointmentRepository appointments, MemberRepository members, BookingPolicy policy,
-                          ApplicationEventPublisher events) {
+                          ApplicationEventPublisher events, BespokeOrderRepository orders) {
         this.appointments = appointments;
         this.members = members;
         this.policy = policy;
         this.events = events;
+        this.orders = orders;
     }
 
     /** 하루의 자리들. {@code available} — 손님이 지금 잡을 수 있는가(규칙 통과 · 비어 있음). */
@@ -78,8 +83,9 @@ public class BookingService {
         return days;
     }
 
+    /** 손님 신청. {@code orderNumber} 가 있으면 그 손님의 진행 중 주문이어야 한다(가봉 · 수령 예약). */
     @Transactional
-    public Appointment request(UUID memberId, AppointmentType type, Instant startsAt, String note) {
+    public Appointment request(UUID memberId, AppointmentType type, Instant startsAt, String note, String orderNumber) {
         Instant now = Instant.now();
         String why = policy.whyNotBookable(startsAt, now);
         if (why != null) {
@@ -88,14 +94,61 @@ public class BookingService {
         if (appointments.countByMemberIdAndStatusIn(memberId, AppointmentStatus.LIVE) >= MAX_LIVE_PER_MEMBER) {
             throw new DomainRuleException("TOO_MANY_LIVE", "진행 중인 예약은 " + MAX_LIVE_PER_MEMBER + "개까지만 둘 수 있습니다. 지난 예약을 취소하거나 끝난 뒤 다시 신청해 주세요.");
         }
+        BespokeOrder order = orderOf(memberId, orderNumber);
         if (appointments.existsByStartsAtAndStatusIn(startsAt, AppointmentStatus.LIVE)) {
             throw new DomainRuleException("SLOT_TAKEN", "그 시간은 이미 예약이 있습니다. 다른 시간을 골라 주세요.");
         }
-        Appointment created = appointments.save(Appointment.request(memberId, type, startsAt, note));
+        Appointment a = Appointment.request(memberId, type, startsAt, note);
+        if (order != null) {
+            a.linkOrder(order.getId());
+        }
+        Appointment created = appointments.save(a);
         appointments.flush(); // 같은 자리를 동시에 누른 경우 여기서 유니크 인덱스에 걸린다(409)
         log.info("예약 신청 id={} memberId={} type={} startsAt={}", created.getId(), memberId, type, startsAt);
         events.publishEvent(new BookingNotifier.Event(BookingNotifier.Kind.REQUESTED, created.getId()));
         return created;
+    }
+
+    /**
+     * 관리자가 상담 중에 잡는 예약 — 바로 확정이고 손님에게 확정 메일이 간다.
+     * 앞뒤 제한(24시간 · 60일)과 손님당 개수 제한은 없다. 자리 눈금 · 빈 자리는 본다.
+     */
+    @Transactional
+    public WithMember createByAdmin(UUID memberId, AppointmentType type, Instant startsAt, String adminNote, String orderNumber) {
+        Member member = members.findById(memberId).filter(Member::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("회원 없음 id=" + memberId));
+        if (!policy.isSlot(startsAt)) {
+            throw DomainRuleException.badRequest("NOT_BOOKABLE", "영업 시간 안의 자리 시각이어야 합니다.");
+        }
+        if (appointments.existsByStartsAtAndStatusIn(startsAt, AppointmentStatus.LIVE)) {
+            throw new DomainRuleException("SLOT_TAKEN", "그 시간은 이미 다른 예약이 있습니다.");
+        }
+        BespokeOrder order = orderOf(memberId, orderNumber);
+        Appointment a = Appointment.byAdmin(member.getId(), type, startsAt, adminNote, Instant.now());
+        if (order != null) {
+            a.linkOrder(order.getId());
+        }
+        Appointment created = appointments.save(a);
+        appointments.flush();
+        log.info("예약 생성(관리자) id={} memberId={} type={} startsAt={}", created.getId(), memberId, type, startsAt);
+        events.publishEvent(new BookingNotifier.Event(BookingNotifier.Kind.CONFIRMED, created.getId()));
+        return new WithMember(created, member);
+    }
+
+    /** 한 주문에 묶인 예약 전부(취소 포함) — 관리자 주문 상세. */
+    @Transactional(readOnly = true)
+    public List<Appointment> ofOrder(UUID orderId) {
+        return appointments.findByOrderIdOrderByStartsAtAsc(orderId);
+    }
+
+    /** 주문번호 → 그 손님의 진행 중 주문. 없거나 남의 것이거나 끝났으면 400. 비어 있으면 null. */
+    private BespokeOrder orderOf(UUID memberId, String orderNumber) {
+        if (orderNumber == null || orderNumber.isBlank()) {
+            return null;
+        }
+        return orders.findByOrderNumber(orderNumber.trim())
+                .filter(o -> o.isOwnedBy(memberId) && o.getStatus() == OrderStatus.IN_PROGRESS)
+                .orElseThrow(() -> DomainRuleException.badRequest("UNKNOWN_ORDER", "진행 중인 맞춤 주문이 아닙니다."));
     }
 
     @Transactional(readOnly = true)

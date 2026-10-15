@@ -1,5 +1,6 @@
 package com.themanly.catalog;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,4 +21,6 @@ public interface StyleOptionRepository extends JpaRepository<StyleOption, UUID> 
 
     @Query("SELECT COALESCE(MAX(o.sortOrder), 0) FROM StyleOption o WHERE o.category = :category")
     int maxSortOrder(StyleOption.Category category);
+
+    List<StyleOption> findByIdIn(Collection<UUID> ids);
 }

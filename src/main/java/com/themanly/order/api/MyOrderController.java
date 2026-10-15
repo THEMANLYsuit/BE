@@ -42,7 +42,7 @@ public class MyOrderController {
     public record Summary(String orderNumber, String title, Garment garment, String garmentLabel, OrderStage stage,
                           String stageLabel, OrderStatus status, String statusLabel, LocalDate dueOn, Instant createdAt,
                           Instant lastEventAt) {
-        static Summary from(BespokeOrder o) {
+        public static Summary from(BespokeOrder o) {
             return new Summary(o.getOrderNumber(), o.getTitle(), o.getGarment(), o.getGarment().label(), o.getStage(),
                     o.getStage().label(), o.getStatus(), o.getStatus().label(), o.getDueOn(), o.getCreatedAt(), o.getLastEventAt());
         }

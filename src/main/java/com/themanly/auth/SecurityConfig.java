@@ -86,6 +86,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/fabrics", "/api/fabrics/*", "/api/style-options").permitAll()
                         // 빈 시간은 로그인 없이 본다 — 예약 자체는 로그인해야 한다
                         .requestMatchers(HttpMethod.GET, "/api/bookings/availability").permitAll()
+                        // 문의 보내기 — 비회원도. 로그인했으면 회원에 묶인다(컨트롤러가 principal 을 본다)
+                        .requestMatchers(HttpMethod.POST, "/api/inquiries").permitAll()
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/admin-login", "/api/auth/csrf",
                                 "/api/auth/password-reset/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
