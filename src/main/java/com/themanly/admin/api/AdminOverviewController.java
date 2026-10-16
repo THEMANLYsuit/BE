@@ -33,4 +33,4 @@ public class AdminOverviewController {
             return new BookingBrief(a.getId(), a.getMemberId(), a.getType(), a.getType().label(), a.getStatus(), a.getStatus().label(), a.getStartsAt(), a.getOrderId());}}
     public record Dashboard(long todayAppointments, List<BookingBrief> todayList, long requestedAppointments, long inProgressOrders, Map<OrderStage, Long> ordersByStage, List<MyOrderController.Summary> dueThisWeek, long openInquiries) { }
     public record MemberOverview(AdminMemberController.View member, AdminMeasurementController.AdminView latestMeasurement, int measurementCount, List<MyOrderController.Summary> orders, List<BookingBrief> upcoming) { }
-}
+} 

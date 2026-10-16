@@ -154,6 +154,13 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("INVALID_STATE", "지금 상태에서는 할 수 없는 작업입니다. 화면을 새로고침해 주세요.", traceId));
     }
 
+    /** 올린 파일이 서블릿 상한(max-file-size)을 넘었다 (V9 사진). 다 받기 전에 끊긴다. 400. */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of("FILE_TOO_LARGE", "파일이 너무 큽니다. 10MB 이하로 올려 주세요.", currentTraceId()));
+    }
+
     /** 위에서 걸리지 않은 모든 예외. 예외 메시지를 절대 내보내지 않는다 — traceId 로 서버 로그를 찾는다. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e, HttpServletRequest request) {

@@ -88,6 +88,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/bookings/availability").permitAll()
                         // 문의 보내기 — 비회원도. 로그인했으면 회원에 묶인다(컨트롤러가 principal 을 본다)
                         .requestMatchers(HttpMethod.POST, "/api/inquiries").permitAll()
+                        // 올린 사진 내보내기 (V9). 올리기는 /api/admin/media — 아래 관리자 규칙
+                        .requestMatchers(HttpMethod.GET, "/media/**").permitAll()
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/admin-login", "/api/auth/csrf",
                                 "/api/auth/password-reset/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
