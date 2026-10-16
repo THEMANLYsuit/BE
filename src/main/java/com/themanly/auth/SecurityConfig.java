@@ -95,6 +95,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         // 관리자 지정 · 해제는 최고 관리자만. /api/admin/** 보다 먼저 와야 한다
                         .requestMatchers(HttpMethod.PUT, "/api/admin/members/*/role").hasRole("SUPER_ADMIN")
+                        // 접속 기록(V10) 조회는 최고 관리자만
+                        .requestMatchers("/api/admin/access-logs").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 나머지는 전부 인증 — 새 엔드포인트를 만들고 규칙을 깜빡해도 열리지 않는다
