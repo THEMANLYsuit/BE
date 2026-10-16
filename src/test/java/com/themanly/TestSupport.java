@@ -31,6 +31,7 @@ public final class TestSupport {
     public static void cleanDatabase(JdbcTemplate jdbc) {
         jdbc.update("DELETE FROM spring_session");
         jdbc.update("DELETE FROM admin_access_log");
+        jdbc.update("DELETE FROM film");
         jdbc.update("DELETE FROM media_asset");
         jdbc.update("DELETE FROM inquiry");
         jdbc.update("DELETE FROM appointment");

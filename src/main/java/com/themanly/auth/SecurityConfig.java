@@ -90,6 +90,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/inquiries").permitAll()
                         // 올린 사진 내보내기 (V9). 올리기는 /api/admin/media — 아래 관리자 규칙
                         .requestMatchers(HttpMethod.GET, "/media/**").permitAll()
+                        // 메인 스크롤 필름(V11) — 사진 주소 규칙과 사진. 올리기는 /api/admin/film — 아래 관리자 규칙
+                        .requestMatchers(HttpMethod.GET, "/api/film", "/film/**").permitAll()
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/admin-login", "/api/auth/csrf",
                                 "/api/auth/password-reset/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()

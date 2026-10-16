@@ -33,7 +33,9 @@ RUN java -Djarmode=tools -jar build/libs/app.jar extract --destination /out
 FROM eclipse-temurin:21-jre-alpine AS runtime
 
 # root 로 띄우지 않는다. 컨테이너가 뚫려도 파일시스템의 나머지는 못 건드린다.
-RUN addgroup -S app && adduser -S -G app app \
+# ffmpeg — 메인 필름 영상(V11)을 사진 묶음으로 뽑는다. AI 가 아니라 영상 변환 도구다
+RUN apk add --no-cache ffmpeg \
+ && addgroup -S app && adduser -S -G app app \
  && mkdir -p /var/lib/themanly/media \
  && chown -R app:app /var/lib/themanly
 
