@@ -31,7 +31,6 @@ public class AdminAccessLog {
     private String userAgent;
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-
     protected AdminAccessLog() {
     }
 
@@ -53,6 +52,7 @@ public class AdminAccessLog {
         return s.length() > max ? s.substring(0, max) : s;
     }
     public Long getId(){return id;}
+    public String getUserAgent(){return userAgent;}
     public UUID getActorId(){return actorId;}
     public String getActorEmail(){return actorEmail;}
     public String getMethod(){return method;}

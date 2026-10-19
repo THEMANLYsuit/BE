@@ -32,6 +32,12 @@ public final class AuthRequests {
     public record AdminLogin(@NotBlank @Size(max = 254) String loginId, @NotBlank @Size(max = 1000) String password) {
     }
 
+    /** 아이디 찾기 — 가입할 때(또는 마이페이지에서) 적은 이름과 휴대폰 번호. 하이픈은 있어도 없어도 된다. */
+    public record FindEmail(
+            @NotBlank @Size(max = 50) String name,
+            @NotBlank @Pattern(regexp = "^[0-9-]{9,20}$", message = "휴대폰 번호 형식이 올바르지 않습니다.") String phone) {
+    }
+
     public record PasswordResetRequest(@NotBlank @Email @Size(max = 254) String email) {
     }
 

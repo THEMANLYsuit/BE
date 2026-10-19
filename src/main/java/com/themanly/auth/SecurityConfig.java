@@ -93,7 +93,7 @@ public class SecurityConfig {
                         // 메인 스크롤 필름(V11) — 사진 주소 규칙과 사진. 올리기는 /api/admin/film — 아래 관리자 규칙
                         .requestMatchers(HttpMethod.GET, "/api/film", "/film/**").permitAll()
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/admin-login", "/api/auth/csrf",
-                                "/api/auth/password-reset/**").permitAll()
+                                "/api/auth/password-reset/**", "/api/auth/find-email").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         // 관리자 지정 · 해제는 최고 관리자만. /api/admin/** 보다 먼저 와야 한다
                         .requestMatchers(HttpMethod.PUT, "/api/admin/members/*/role").hasRole("SUPER_ADMIN")

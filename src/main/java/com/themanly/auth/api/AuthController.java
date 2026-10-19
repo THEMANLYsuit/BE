@@ -1,6 +1,7 @@
 package com.themanly.auth.api;
 
 import com.themanly.auth.AuthService;
+import com.themanly.auth.FindEmailService;
 import com.themanly.auth.MemberPrincipal;
 import com.themanly.auth.PasswordResetService;
 import com.themanly.member.Member;
@@ -33,12 +34,14 @@ public class AuthController {
     private final AuthService authService;
     private final SecurityContextRepository contextRepository;
     private final PasswordResetService passwordReset;
+    private final FindEmailService findEmail;
 
     public AuthController(AuthService authService, SecurityContextRepository contextRepository,
-                          PasswordResetService passwordReset) {
+                          PasswordResetService passwordReset, FindEmailService findEmail) {
         this.authService = authService;
         this.contextRepository = contextRepository;
         this.passwordReset = passwordReset;
+        this.findEmail = findEmail;
     }
 
     /** CSRF 토큰 발급. 프론트가 로그인 · 가입 전에 한 번 받아 두고, 이후 POST 는 X-XSRF-TOKEN 헤더에 싣는다. */
@@ -92,6 +95,18 @@ public class AuthController {
         }
         SecurityContextHolder.clearContext();
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 아이디 찾기 — 이름 · 휴대폰 번호가 같은 계정의 <b>가린</b> 이메일. 없으면 빈 목록(200). 같은 IP 는 10분에 10번까지(429).
+     * 주소에 개인정보가 남지 않게 POST 로 받는다.
+     */
+    @PostMapping("/find-email")
+    public FindEmailResponse findEmail(@Valid @RequestBody AuthRequests.FindEmail request, HttpServletRequest http) {
+        return new FindEmailResponse(findEmail.find(request.name(), request.phone(), http.getRemoteAddr()));
+    }
+
+    public record FindEmailResponse(List<FindEmailService.Account> accounts) {
     }
 
     /** 비밀번호 찾기 — 언제나 202. 가입된 이메일이든 아니든 같은 답을 한다. */
