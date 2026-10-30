@@ -14,6 +14,7 @@ import com.themanly.TestcontainersConfiguration;
 import com.themanly.auth.AuthService;
 import com.themanly.member.AdminMemberService;
 import com.themanly.member.MemberRole;
+import com.themanly.site.FrontRebuildTrigger;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,12 +25,15 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** 원단 · 스타일 카탈로그 — 관리자 등록과 손님 노출 규칙. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, TestMailConfiguration.class})
+@RecordApplicationEvents
 class CatalogApiTest {
 
     @Autowired
@@ -42,6 +46,14 @@ class CatalogApiTest {
     private AdminMemberService admins;
 
     private Cookie admin;
+
+    @Autowired
+    private ApplicationEvents events;
+
+    /** 손님 화면 다시 빌드 요청 수 (FrontRebuildTrigger.SiteChanged) */
+    private long rebuilds() {
+        return events.stream(FrontRebuildTrigger.SiteChanged.class).count();
+    }
 
     @BeforeEach
     void setUp() throws Exception {
@@ -152,5 +164,37 @@ class CatalogApiTest {
         Cookie member = TestSupport.login(mockMvc, "seed@example.com");
         mockMvc.perform(csrf(mockMvc, post("/api/admin/fabrics"), member).contentType(MediaType.APPLICATION_JSON).content(fabric("A-1", "a")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("손님 화면 다시 빌드 — 준비 중 원단 등록 · 수정은 안 하고, 공개 · 공개 원단 수정 · 순서 · 스타일 선택지는 한다")
+    void rebuildOnlyWhenCustomersSeeIt() throws Exception {
+        String res = mockMvc.perform(csrf(mockMvc, post("/api/admin/fabrics"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content(fabric("VBC-2001", "차콜 플란넬")))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(res, "$.id");
+        mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/" + id), admin).contentType(MediaType.APPLICATION_JSON)
+                .content(fabric("VBC-2001", "차콜 플란넬 2"))).andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(rebuilds()).isZero();
+
+        mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/" + id + "/status"), admin).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"PUBLISHED\"}")).andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(rebuilds()).isEqualTo(1);
+        mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/" + id), admin).contentType(MediaType.APPLICATION_JSON)
+                .content(fabric("VBC-2001", "차콜 플란넬 3"))).andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(rebuilds()).isEqualTo(2);
+        mockMvc.perform(csrf(mockMvc, put("/api/admin/fabrics/order"), admin).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\":[\"" + id + "\"]}")).andExpect(status().isNoContent());
+        org.assertj.core.api.Assertions.assertThat(rebuilds()).isEqualTo(3);
+
+        mockMvc.perform(csrf(mockMvc, post("/api/admin/style-options"), admin).contentType(MediaType.APPLICATION_JSON).content("""
+                {"category":"LAPEL","code":"notch","name":"노치 라펠","description":"","imageUrl":"","isDefault":true,"enabled":true}
+                """)).andExpect(status().isCreated());
+        org.assertj.core.api.Assertions.assertThat(rebuilds()).isEqualTo(4);
+        // 꺼 둔 선택지 등록은 손님 화면과 상관없다
+        mockMvc.perform(csrf(mockMvc, post("/api/admin/style-options"), admin).contentType(MediaType.APPLICATION_JSON).content("""
+                {"category":"LAPEL","code":"shawl","name":"숄 칼라","description":"","imageUrl":"","isDefault":false,"enabled":false}
+                """)).andExpect(status().isCreated());
+        org.assertj.core.api.Assertions.assertThat(rebuilds()).isEqualTo(4);
     }
 }

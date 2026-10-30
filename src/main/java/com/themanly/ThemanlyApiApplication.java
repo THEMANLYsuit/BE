@@ -6,14 +6,18 @@ import java.util.stream.Stream;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * THE MANLY 맞춤정장 API.
  *
  * <p>레오네페리토 API 와 같은 틀(Spring Boot 4.1 · Java 21 · PostgreSQL 18 · 세션 쿠키)이다.
  * 다른 점은 파는 방식 — 기성복 주문 · 결제 대신 <b>상담 예약 → 치수 → 맞춤 주문 진행</b>이다.
+ *
+ * <p>{@code @EnableScheduling} — 예약 전날 알림(BookingReminder)이 매일 정해진 시각에 돈다.
  */
 @SpringBootApplication
+@EnableScheduling
 public class ThemanlyApiApplication {
 
     public static void main(String[] args) {

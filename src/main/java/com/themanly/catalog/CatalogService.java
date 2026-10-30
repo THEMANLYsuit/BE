@@ -2,6 +2,7 @@ package com.themanly.catalog;
 
 import com.themanly.common.error.DomainRuleException;
 import com.themanly.common.error.ResourceNotFoundException;
+import com.themanly.site.FrontRebuildTrigger;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -9,10 +10,16 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 원단 · 스타일 카탈로그 — 손님 읽기와 관리자 등록 · 수정. */
+/**
+ * 원단 · 스타일 카탈로그 — 손님 읽기와 관리자 등록 · 수정.
+ *
+ * <p>손님 화면은 카탈로그를 <b>빌드할 때</b> 받는다. 손님에게 보이는 것이 바뀌면(공개된 원단 수정 · 공개 · 내림 · 순서,
+ * 스타일 선택지) 커밋 뒤 손님 화면을 다시 만든다(FrontRebuildTrigger). 준비 중 원단만 고친 것은 다시 만들지 않는다.
+ */
 @Service
 public class CatalogService {
 
@@ -21,10 +28,16 @@ public class CatalogService {
 
     private final FabricRepository fabrics;
     private final StyleOptionRepository styleOptions;
+    private final ApplicationEventPublisher events;
 
-    public CatalogService(FabricRepository fabrics, StyleOptionRepository styleOptions) {
+    public CatalogService(FabricRepository fabrics, StyleOptionRepository styleOptions, ApplicationEventPublisher events) {
         this.fabrics = fabrics;
         this.styleOptions = styleOptions;
+        this.events = events;
+    }
+
+    private void rebuild(String reason) {
+        events.publishEvent(new FrontRebuildTrigger.SiteChanged(reason));
     }
 
     // ── 손님 ──────────────────────────────────────────────
@@ -77,6 +90,9 @@ public class CatalogService {
         Fabric fabric = fabric(id);
         fabric.change(details);
         log.info("원단 수정 id={}", id);
+        if (fabric.isVisible()) {
+            rebuild("원단 수정");
+        }
         return fabric;
     }
 
@@ -86,8 +102,13 @@ public class CatalogService {
         if (status != Fabric.Status.DRAFT && fabric.getName().isBlank()) {
             throw new DomainRuleException("NOT_READY", "이름이 없는 원단은 공개할 수 없습니다.");
         }
+        boolean wasVisible = fabric.isVisible();
         fabric.changeStatus(status);
         log.info("원단 상태 id={} status={}", id, status);
+        // 준비 중 → 준비 중은 손님 화면과 상관없다. 공개 · 품절 · 내림은 다시 만든다
+        if (wasVisible || fabric.isVisible()) {
+            rebuild("원단 상태");
+        }
         return fabric;
     }
 
@@ -103,6 +124,9 @@ public class CatalogService {
             byId.get(ids.get(i)).moveTo((i + 1) * 10);
         }
         log.info("원단 순서 변경 count={}", ids.size());
+        if (found.stream().anyMatch(Fabric::isVisible)) {
+            rebuild("원단 순서");
+        }
     }
 
     /** 스타일 선택지 순서 — 같은 묶음 안에서만. */
@@ -117,6 +141,7 @@ public class CatalogService {
             byId.get(ids.get(i)).moveTo((i + 1) * 10);
         }
         log.info("스타일 선택지 순서 변경 category={} count={}", category, ids.size());
+        rebuild("스타일 순서");
     }
 
     // ── 관리자: 스타일 선택지 ─────────────────────────────
@@ -141,14 +166,21 @@ public class CatalogService {
         applyStyleOption(option, details);
         styleOptions.save(option);
         log.info("스타일 선택지 등록 id={} category={} code={}", option.getId(), category, normalized);
+        if (option.isEnabled()) {
+            rebuild("스타일 등록");
+        }
         return option;
     }
 
     @Transactional
     public StyleOption updateStyleOption(UUID id, StyleOption.Details details) {
         StyleOption option = styleOption(id);
+        boolean wasEnabled = option.isEnabled();
         applyStyleOption(option, details);
         log.info("스타일 선택지 수정 id={}", id);
+        if (wasEnabled || option.isEnabled()) {
+            rebuild("스타일 수정");
+        }
         return option;
     }
 

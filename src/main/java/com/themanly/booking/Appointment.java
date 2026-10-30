@@ -59,6 +59,10 @@ public class Appointment {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
+    /** 전날 알림 메일을 보낸 시각(V12). 시간을 옮기면 비운다 — 새 날짜로 다시 알린다(BookingReminder). */
+    @Column(name = "reminded_at")
+    private Instant remindedAt;
+
     /** 가봉 · 수령 예약이 속한 맞춤 주문(V7). 상담 예약은 null. */
     @Column(name = "order_id")
     private UUID orderId;
@@ -149,10 +153,20 @@ public class Appointment {
             throw new IllegalStateException("옮길 수 없는 상태 status=" + status);
         }
         this.startsAt = Objects.requireNonNull(startsAt, "startsAt");
+        this.remindedAt = null;
         if (status == AppointmentStatus.REQUESTED) {
             this.status = AppointmentStatus.CONFIRMED;
             this.confirmedAt = now;
         }
+    }
+
+    /** 전날 알림을 보냈다(BookingReminder). */
+    public void markReminded(Instant now) {
+        this.remindedAt = now;
+    }
+
+    public Instant getRemindedAt() {
+        return remindedAt;
     }
 
     public void setAdminNote(String adminNote) {

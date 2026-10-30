@@ -83,7 +83,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         // 공개 — 손님 화면이 빌드 때 · 둘러볼 때 받는다
-                        .requestMatchers(HttpMethod.GET, "/api/fabrics", "/api/fabrics/*", "/api/style-options").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/fabrics", "/api/fabrics/*", "/api/style-options", "/api/site-business", "/api/site-copy").permitAll()
                         // 빈 시간은 로그인 없이 본다 — 예약 자체는 로그인해야 한다
                         .requestMatchers(HttpMethod.GET, "/api/bookings/availability").permitAll()
                         // 문의 보내기 — 비회원도. 로그인했으면 회원에 묶인다(컨트롤러가 principal 을 본다)

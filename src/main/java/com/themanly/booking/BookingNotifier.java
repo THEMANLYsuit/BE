@@ -30,7 +30,8 @@ public class BookingNotifier {
             DateTimeFormatter.ofPattern("yyyy년 M월 d일 (E) HH:mm", Locale.KOREAN).withZone(ZoneId.of("Asia/Seoul"));
     private static final String FOOTER = "\n\n─────────────\nTHE MANLY 맞춤정장\n경기도 수원시 영통구 매영로 425번길 1 1층\n이 메일은 발신 전용입니다.\n";
 
-    public enum Kind { REQUESTED, CONFIRMED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_ADMIN, RESCHEDULED }
+    /** REMINDER — 확정된 예약의 전날 알림(V12, BookingReminder) */
+    public enum Kind { REQUESTED, CONFIRMED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_ADMIN, RESCHEDULED, REMINDER }
 
     public record Event(Kind kind, UUID appointmentId) {
     }
@@ -73,6 +74,9 @@ public class BookingNotifier {
                         + "오시기 어려워지면 내 예약에서 취소하거나 매장으로 연락해 주세요." + mine);
                 case RESCHEDULED -> toCustomer(m, what + " 예약 시간이 바뀌었습니다", "예약 시간이 아래와 같이 바뀌었습니다.\n\n"
                         + "일시  " + when + "\n장소  THE MANLY 수원 매장\n\n맞지 않으면 매장으로 연락해 주세요." + mine);
+                case REMINDER -> toCustomer(m, "내일 " + what + " 예약이 있습니다", "내일 예약을 알려 드립니다.\n\n"
+                        + "일시  " + when + "\n장소  THE MANLY 수원 매장 (경기도 수원시 영통구 매영로 425번길 1 1층)\n\n"
+                        + "오시기 어려워지면 내 예약에서 취소하거나 매장으로 연락해 주세요. 다른 손님이 그 시간을 쓸 수 있습니다." + mine);
                 case CANCELLED_BY_CUSTOMER -> toAdmins("[예약 취소] " + when + " · " + what + " · " + name(m) + " (손님 취소)", detail(a, m));
                 case CANCELLED_BY_ADMIN -> toCustomer(m, what + " 예약이 취소되었습니다", "죄송합니다. 아래 예약이 취소되었습니다.\n\n"
                         + "일시  " + when + (a.getCancelReason() == null ? "" : "\n사유  " + a.getCancelReason())

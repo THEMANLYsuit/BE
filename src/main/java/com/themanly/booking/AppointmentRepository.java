@@ -30,4 +30,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     long countByStartsAtBetweenAndStatusIn(Instant from, Instant to, Collection<AppointmentStatus> statuses);
 
     long countByStatus(AppointmentStatus status);
+
+    /** 전날 알림 대상 — 그날 [from, to) 에 시작하는, 그 상태의, 아직 알리지 않은 예약(V12, BookingReminder). */
+    List<Appointment> findByStartsAtGreaterThanEqualAndStartsAtLessThanAndStatusAndRemindedAtIsNullOrderByStartsAtAsc(
+            Instant from, Instant to, AppointmentStatus status);
 }
