@@ -9,6 +9,8 @@ import com.themanly.common.error.ResourceNotFoundException;
 import com.themanly.measurement.MeasurementRepository;
 import com.themanly.order.BespokeOrderRepository;
 import com.themanly.order.OrderStatus;
+import com.themanly.rental.RentalRepository;
+import com.themanly.rental.RentalStatus;
 import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -31,10 +33,11 @@ public class MemberAccountService {
     private final AppointmentRepository appointments;
     private final BespokeOrderRepository orders;
     private final MeasurementRepository measurements;
+    private final RentalRepository rentals;
 
     public MemberAccountService(MemberRepository members, PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy,
                                 SessionTerminator sessionTerminator, AppointmentRepository appointments,
-                                BespokeOrderRepository orders, MeasurementRepository measurements) {
+                                BespokeOrderRepository orders, MeasurementRepository measurements, RentalRepository rentals) {
         this.members = members;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
@@ -42,6 +45,7 @@ public class MemberAccountService {
         this.appointments = appointments;
         this.orders = orders;
         this.measurements = measurements;
+        this.rentals = rentals;
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +76,7 @@ public class MemberAccountService {
     }
 
     /**
-     * 탈퇴. 관리자는 못 한다(권한을 먼저 내린다). 진행 중 예약 · 맞춤 주문이 있으면 못 한다.
+     * 탈퇴. 관리자는 못 한다(권한을 먼저 내린다). 진행 중 예약 · 맞춤 주문 · 대여가 있으면 못 한다.
      * 세션을 끊고 익명화하고, 치수 기록은 지운다 — 몸 치수는 남겨 둘 이유가 없는 개인정보다.
      */
     @Transactional
@@ -90,6 +94,10 @@ public class MemberAccountService {
         }
         if (orders.existsByMemberIdAndStatus(memberId, OrderStatus.IN_PROGRESS)) {
             throw new DomainRuleException("ORDERS_IN_PROGRESS", "진행 중인 맞춤 주문이 있어 탈퇴할 수 없습니다. 매장으로 연락해 주세요.");
+        }
+        // 옷을 가져간 채(대여 중) 탈퇴하면 연락할 길이 없어진다
+        if (rentals.existsByMemberIdAndStatusIn(memberId, RentalStatus.LIVE)) {
+            throw new DomainRuleException("RENTALS_IN_PROGRESS", "진행 중인 대여가 있어 탈퇴할 수 없습니다. 대여를 취소하거나 반납한 뒤 다시 시도해 주세요.");
         }
         sessionTerminator.terminateAll(member.getEmail());
         measurements.deleteByMemberId(memberId);

@@ -33,6 +33,8 @@ public final class TestSupport {
         jdbc.update("DELETE FROM admin_access_log");
         jdbc.update("DELETE FROM film");
         jdbc.update("DELETE FROM media_asset");
+        jdbc.update("DELETE FROM rental");
+        jdbc.update("DELETE FROM rental_item");
         jdbc.update("DELETE FROM inquiry");
         jdbc.update("DELETE FROM appointment");
         jdbc.update("DELETE FROM bespoke_order");
