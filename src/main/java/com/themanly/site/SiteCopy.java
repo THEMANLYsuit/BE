@@ -15,11 +15,10 @@ import java.util.Objects;
 @Table(name = "site_copy")
 public class SiteCopy {
     public static final short SINGLETON_ID = 1;
-    public record Content(@Valid @NotNull Hero hero, @Valid @NotNull @Size(min = 3, max = 3) List<Frame> film, @Valid @NotNull Body body, @Valid @NotNull @Size(min = 5, max = 5) List<Card> highlights, @NotBlank @Size(max = 200) String processIntro, @Valid @NotNull @Size(min = 6, max = 6) List<Step> process, @Valid @NotNull @Size(min = 5, max = 5) List<Card> closer, @NotBlank @Size(max = 300) String manifesto, @Valid @NotNull TwoLines booking, @Valid @NotNull Shop shop){}
-    public record Hero(@NotBlank @Size(max = 40) String eyebrow, @NotBlank @Size(max = 30) String line1, @NotBlank @Size(max = 30) String line2, @NotBlank @Size(max = 200) String body){}
-    public record Frame(@NotBlank @Size(max = 30) String eyebrow, @NotBlank @Size(max = 40) String title, @NotBlank @Size(max =120) String body){}
-    public record Body(@NotBlank @Size(max = 30) String line1, @NotBlank @Size(max =30) String line2, @Valid @NotNull @Size(min = 3, max = 3) List<Card> promises){}
-    public record Card(@NotBlank @Size(max = 40) String title, @NotBlank @Size(max = 200) String body) { }
+    // 2026-11-02 새 메인(V17): 예전 메인 문구(hero · film · body · highlights · closer · manifesto)를 걷고 story 를 넣었다
+    public record Content(@Valid @NotNull Story story, @NotBlank @Size(max = 200) String processIntro, @Valid @NotNull @Size(min = 6, max = 6) List<Step> process, @Valid @NotNull TwoLines booking, @Valid @NotNull Shop shop){}
+    /** 새 메인 — Various Body Types → Custom Fit 두 제목과 마지막 장면의 설명 글 */
+    public record Story(@NotBlank @Size(max = 40) String bodiesTitle, @NotBlank @Size(max = 40) String fitTitle, @NotBlank @Size(max = 600) String fitBody){}
     public record Step(@NotBlank @Size(max = 20) String title, @NotBlank @Size(max = 30) String en, @NotBlank @Size(max = 200) String body, @NotBlank @Size(max = 20) String duration){}
     public record TwoLines(@NotBlank @Size(max = 30) String line1, @NotBlank @Size(max =30) String line2){}
     public record Shop(@NotBlank @Size(max = 40) String openDays, @NotBlank @Size(max= 40) String hours, @NotBlank @Size(max = 40) String closedDays){}

@@ -129,6 +129,20 @@ class FilmApiTest {
                 .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("immutable")));
         assertThat(Files.exists(store.resolve("film").resolve(id).resolve("source.tmp"))).isFalse(); // 원본은 남기지 않는다
 
+        // 새 메인 첫 화면 — 반복 재생 영상(소리 없음 mp4)과 첫 장면 사진. 영상은 부분 요청(Range)에 206 으로 답한다(사파리)
+        mockMvc.perform(get("/api/film"))
+                .andExpect(jsonPath("$.video").value("https://api.example.test/film/" + id + "/loop.mp4"))
+                .andExpect(jsonPath("$.poster").value("https://api.example.test/film/" + id + "/f001.webp"));
+        byte[] loop = mockMvc.perform(get("/film/" + id + "/loop.mp4"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "video/mp4"))
+                .andReturn().getResponse().getContentAsByteArray();
+        assertThat(FilmService.isVideo(loop)).isTrue();
+        mockMvc.perform(get("/film/" + id + "/loop.mp4").header("Range", "bytes=0-99"))
+                .andExpect(status().isPartialContent())
+                .andExpect(header().string("Content-Range", org.hamcrest.Matchers.startsWith("bytes 0-99/")));
+        mockMvc.perform(get("/film/" + id + "/source.tmp")).andExpect(status().isNotFound());
+
         String second = JsonPath.read(mockMvc.perform(upload(clip, "turn2.mp4", admin)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(), "$.id");
         mockMvc.perform(get("/api/film")).andExpect(jsonPath("$.id").value(second));

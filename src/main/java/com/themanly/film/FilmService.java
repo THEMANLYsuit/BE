@@ -29,11 +29,18 @@ import org.springframework.web.multipart.MultipartFile;
  * <p>받는 영상은 MP4 · MOV(아이폰) · WebM. 앞머리 바이트로 확인하고, 실제로 풀 수 있는지는 ffmpeg 가 판단한다.
  * 앞 {@code max-seconds} 초까지만 쓴다(사진 수 = 그 초 × fps). 변환이 실패하면 만든 것을 지우고 아무것도 바꾸지 않는다.
  * 성공하면 새 필름이 메인에 걸리고(active), 지난 필름은 남는다.
+ *
+ * <p>2026-11-02 새 메인(디자이너 시안)은 첫 화면에 영상을 그대로 반복 재생한다 — 그래서 사진 묶음과 함께
+ * 반복 재생용 영상({@value #LOOP}: H.264 · 소리 없음 · 가로 최대 1920 · 앞부분부터 내려받으며 재생)도 만든다.
+ * 첫 장면 사진은 사진 묶음의 첫 장(f001.webp)이다.
  */
 @Service
 public class FilmService {
 
     private static final Logger log = LoggerFactory.getLogger(FilmService.class);
+
+    /** 반복 재생용 영상 파일 이름 — 필름 폴더 안 */
+    static final String LOOP = "loop.mp4";
 
     /** 영상 상한 — application.yml 의 max-file-size 와 같은 값 */
     public static final long MAX_BYTES = 60L * 1024 * 1024;
@@ -62,12 +69,16 @@ public class FilmService {
         this.apiBase = apiBase.replaceAll("/+$", "");
     }
 
-    /** 화면이 쓰는 모양 — 사진 주소는 {@code base + 001 + ext} 처럼 만든다(세 자리, 1부터). */
-    public record Sequence(UUID id, int frames, int fps, String base, int pad, String ext) {
+    /**
+     * 화면이 쓰는 모양 — 사진 주소는 {@code base + 001 + ext} 처럼 만든다(세 자리, 1부터).
+     * {@code video} — 반복 재생용 영상, {@code poster} — 첫 장면 사진(새 메인 첫 화면).
+     */
+    public record Sequence(UUID id, int frames, int fps, String base, int pad, String ext, String video, String poster) {
     }
 
     public Sequence sequenceOf(Film f) {
-        return new Sequence(f.getId(), f.getFrameCount(), f.getFps(), apiBase + "/film/" + f.getId() + "/f", 3, ".webp");
+        String dir = apiBase + "/film/" + f.getId() + "/";
+        return new Sequence(f.getId(), f.getFrameCount(), f.getFps(), dir + "f", 3, ".webp", dir + LOOP, dir + "f001.webp");
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +117,7 @@ public class FilmService {
                 Files.copy(in, source, StandardCopyOption.REPLACE_EXISTING);
             }
             int frames = extract(source, dir);
+            encodeLoop(source, dir);
             Files.deleteIfExists(source);
 
             films.findFirstByActiveTrue().ifPresent(old -> {
@@ -160,8 +172,51 @@ public class FilmService {
         return frames;
     }
 
+    /**
+     * 반복 재생용 영상을 만든다 — 소리는 뺀다(첫 화면은 소리 없이 자동 재생해야 브라우저가 막지 않는다).
+     * faststart: 앞부분에 색인을 둬서 다 내려받기 전에 재생이 시작된다. 실패하면 400(만든 것은 upload 가 지운다).
+     */
+    private void encodeLoop(Path source, Path dir) throws IOException {
+        run(List.of(ffmpeg, "-v", "error", "-y", "-i", source.toString(),
+                "-t", String.valueOf(maxSeconds), "-an",
+                "-vf", "scale='min(1920,iw)':-2",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                dir.resolve(LOOP).toString()), dir);
+        if (!Files.isRegularFile(dir.resolve(LOOP)) || Files.size(dir.resolve(LOOP)) == 0) {
+            throw invalid("영상을 읽지 못했습니다. 다른 파일로 올려 주세요.");
+        }
+        Files.deleteIfExists(dir.resolve("ffmpeg.log"));
+    }
+
+    /** ffmpeg 한 번 — 못 찾으면 503, 시간이 넘거나 실패하면 400. */
+    private void run(List<String> cmd, Path dir) throws IOException {
+        Process p;
+        try {
+            p = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(dir.resolve("ffmpeg.log").toFile()).start();
+        } catch (IOException e) {
+            log.error("ffmpeg 를 실행하지 못함 path={}", ffmpeg, e);
+            throw new DomainRuleException("FILM_UNAVAILABLE", "서버에서 영상 변환 도구를 찾지 못했습니다. 관리자에게 알려 주세요.",
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        try {
+            if (!p.waitFor(180, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                throw invalid("영상 변환이 너무 오래 걸립니다. 더 짧거나 작은 영상으로 올려 주세요.");
+            }
+        } catch (InterruptedException e) {
+            p.destroyForcibly();
+            Thread.currentThread().interrupt();
+            throw invalid("영상 변환이 중단되었습니다. 다시 올려 주세요.");
+        }
+        if (p.exitValue() != 0) {
+            log.info("반복 영상 변환 실패 exit={}", p.exitValue());
+            throw invalid("영상을 읽지 못했습니다. 다른 파일로 올려 주세요.");
+        }
+    }
+
+    /** 필름 폴더의 파일 — 사진(f001.webp …)과 반복 영상(loop.mp4)만 내보낸다. */
     public Path frame(UUID id, String name) {
-        if (!name.matches("^f\\d{3}\\.webp$")) {
+        if (!name.matches("^f\\d{3}\\.webp$") && !name.equals(LOOP)) {
             throw new ResourceNotFoundException("필름 사진 이름 아님 name=" + name);
         }
         Path path = root.resolve(id.toString()).resolve(name).normalize();

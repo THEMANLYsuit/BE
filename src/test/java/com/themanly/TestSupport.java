@@ -32,6 +32,7 @@ public final class TestSupport {
         jdbc.update("DELETE FROM spring_session");
         jdbc.update("DELETE FROM admin_access_log");
         jdbc.update("DELETE FROM film");
+        jdbc.update("DELETE FROM site_image");
         jdbc.update("DELETE FROM media_asset");
         jdbc.update("DELETE FROM rental");
         jdbc.update("DELETE FROM rental_item");

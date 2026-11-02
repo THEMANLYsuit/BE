@@ -28,7 +28,7 @@ import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** 사이트 문구(V14) — 심은 글이 로그인 없이 읽히고, 관리자만 통째로 고치며, 칸 수 · 빈 칸 · 길이가 틀리면 400. 고치면 다시 빌드. */
+/** 사이트 문구(V14 · 새 메인 V17) —심은 글이 로그인 없이 읽히고, 관리자만 통째로 고치며, 칸 수 · 빈 칸 · 길이가 틀리면 400. 고치면 다시 빌드. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, TestMailConfiguration.class})
@@ -67,17 +67,16 @@ class SiteCopyApiTest {
     }
 
     @Test
-    @DisplayName("V14 가 심은 글이 로그인 없이 읽힌다 — 칸 수가 화면과 같다")
+    @DisplayName("심은 글이 로그인 없이 읽힌다 — 새 메인 글(V17)이 있고 예전 메인 문구는 걷혔다")
     void seededAndPublic() throws Exception {
         mockMvc.perform(get("/api/site-copy"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hero.line2").value("짓는 한 벌"))
-                .andExpect(jsonPath("$.film.length()").value(3))
-                .andExpect(jsonPath("$.body.promises.length()").value(3))
-                .andExpect(jsonPath("$.highlights.length()").value(5))
+                .andExpect(jsonPath("$.story.bodiesTitle").value("Various Body Types"))
+                .andExpect(jsonPath("$.story.fitTitle").value("Custom Fit"))
+                .andExpect(jsonPath("$.hero").doesNotExist())
+                .andExpect(jsonPath("$.film").doesNotExist())
                 .andExpect(jsonPath("$.process.length()").value(6))
                 .andExpect(jsonPath("$.process[5].duration").value("총 5 – 6주"))
-                .andExpect(jsonPath("$.closer.length()").value(5))
                 .andExpect(jsonPath("$.shop.closedDays").value("화 · 수 휴무"));
     }
 
@@ -93,10 +92,12 @@ class SiteCopyApiTest {
         assertThat(events.stream(FrontRebuildTrigger.SiteChanged.class).count()).isEqualTo(1);
 
         for (String bad : new String[] {
-                // 필름 한 장 빠짐
-                seeded.replaceFirst("\\{\"eyebrow\":\"THE PATTERN\"[^}]*},", ""),
+                // 단계 하나 빠짐
+                seeded.replaceFirst("\\{\"title\":\"상담\"[^}]*},", ""),
                 // 빈 제목
-                seeded.replace("\"선 하나에서 시작합니다\"", "\"\""),
+                seeded.replace("\"Custom Fit\"", "\"\""),
+                // 너무 긴 설명 글
+                seeded.replaceFirst("\"fitBody\":\"[^\"]*\"", "\"fitBody\":\"" + "가".repeat(601) + "\""),
                 // 너무 긴 단계 이름
                 seeded.replace("\"상담\"", "\"" + "가".repeat(21) + "\""),
                 // 매장 안내 빠짐

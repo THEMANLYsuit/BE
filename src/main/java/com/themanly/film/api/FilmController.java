@@ -43,7 +43,7 @@ public class FilmController {
     public ResponseEntity<Resource> frame(@PathVariable UUID id, @PathVariable String name) throws IOException {
         Path path = films.frame(id, name);
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("image/webp"))
+                .contentType(MediaType.parseMediaType(name.endsWith(".mp4") ? "video/mp4" : "image/webp"))
                 .contentLength(Files.size(path))
                 .header("X-Content-Type-Options", "nosniff")
                 .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())

@@ -83,7 +83,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         // 공개 — 손님 화면이 빌드 때 · 둘러볼 때 받는다
-                        .requestMatchers(HttpMethod.GET, "/api/fabrics", "/api/fabrics/*", "/api/style-options", "/api/site-business", "/api/site-copy").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/fabrics", "/api/fabrics/*", "/api/style-options", "/api/site-business", "/api/site-copy", "/api/site-images").permitAll()
                         // 대여 옷 목록(V15) — 신청 · 내 대여는 로그인해야 한다
                         .requestMatchers(HttpMethod.GET, "/api/rental-items", "/api/rental-items/*").permitAll()
                         // 빈 시간은 로그인 없이 본다 — 예약 자체는 로그인해야 한다
